@@ -88,10 +88,9 @@ def get_dates():
     fid = find_facility_id(page.text)
     if not fid:
         ids = re.findall(r'name="applicants\[\]"[^>]*value="(\d+)"', page.text) + re.findall(r'value="(\d+)"[^>]*name="applicants\[\]"', page.text)
-        if ids:
-            q = "&".join("applicants%5B%5D=" + i for i in ids)
-            page = s.get(appt + "?" + q + "&confirmed_limit_message=1&commit=Continue", timeout=30)
-            fid = find_facility_id(page.text)
+        q = "".join("applicants%5B%5D=" + i + "&" for i in ids)
+        page = s.get(appt + "?" + q + "confirmed_limit_message=1&commit=Continue", timeout=30)
+        fid = find_facility_id(page.text)
     if not fid:
         raise RuntimeError("Konsullik ID topilmadi. " + page_info(page))
     hdr = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "X-CSRF-Token": csrf(page.text), "Referer": appt}
