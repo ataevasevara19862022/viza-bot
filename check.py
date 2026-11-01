@@ -59,12 +59,23 @@ def find_schedule_id(s):
 def find_facility_id(html):
     if FACILITY_ID:
         return FACILITY_ID
-    sel = re.search('id="appointments_consulate_appointment_facility_id".*?</select>', html, re.S)
+    m = re.search(r'<option[^>]*value="(\d+)"[^>]*>\s*Tashkent', html, re.I)
+    if m:
+        return m.group(1)
+    sel = re.search('facility_id.*?</select>', html, re.S)
     if sel:
         opts = re.findall(r'<option[^>]*value="(\d+)"', sel.group(0))
         if opts:
             return opts[0]
-    raise RuntimeError("Konsullik ID topilmadi.")
+    return ""
+
+
+def page_info(page):
+    t = re.search(r"<title>(.*?)</title>", page.text, re.S)
+    h = re.search(r"<h[12][^>]*>(.*?)</h[12]>", page.text, re.S)
+    title = re.sub(r"\s+", " ", t.group(1)).strip() if t else "-"
+    head = re.sub(r"<[^>]+>|\s+", " ", h.group(1)).strip() if h else "-"
+    return "Sahifa: " + page.url + " | Sarlavha: " + title + " | " + head
 
 
 def get_dates():
@@ -75,6 +86,14 @@ def get_dates():
     appt = BASE + "/schedule/" + sid + "/appointment"
     page = s.get(appt, timeout=30)
     fid = find_facility_id(page.text)
+    if not fid:
+        ids = re.findall(r'name="applicants\[\]"[^>]*value="(\d+)"', page.text) + re.findall(r'value="(\d+)"[^>]*name="applicants\[\]"', page.text)
+        if ids:
+            q = "&".join("applicants%5B%5D=" + i for i in ids)
+            page = s.get(appt + "?" + q + "&confirmed_limit_message=1&commit=Continue", timeout=30)
+            fid = find_facility_id(page.text)
+    if not fid:
+        raise RuntimeError("Konsullik ID topilmadi. " + page_info(page))
     hdr = {"Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest", "X-CSRF-Token": csrf(page.text), "Referer": appt}
     r = s.get(appt + "/days/" + fid + ".json?appointments[expedite]=false", headers=hdr, timeout=30)
     if "json" not in r.headers.get("Content-Type", ""):
@@ -89,8 +108,9 @@ def main():
     except Exception as e:
         st["errors"] = st.get("errors", 0) + 1
         print("XATO:", e)
-        if st["errors"] in (1, 5, 20):
+        if st["errors"] in (1, 5, 20) or str(e) != st.get("last_err"):
             tg("⚠️ Bot xatoga uchradi (" + str(st["errors"]) + "-marta):\n" + str(e))
+        st["last_err"] = str(e)
         save_state(st)
         return
     deadline = datetime.date.fromisoformat(DEADLINE)
