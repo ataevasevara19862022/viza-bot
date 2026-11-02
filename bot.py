@@ -15,7 +15,7 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 
 
 MANUAL = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-
+MANUAL = False
 
 def tg(text):
     r = requests.post("https://api.telegram.org/bot" + TG_TOKEN + "/sendMessage", data={"chat_id": TG_CHAT, "text": text[:4000]}, timeout=20)
